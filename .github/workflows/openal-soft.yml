@@ -1,0 +1,65 @@
+name: openal-soft
+on:
+  push:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build openal-soft-${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win-x64
+            platform-name: x64
+            cmake-opts: "-DALSOFT_BUILD_ROUTER=ON -DALSOFT_REQUIRE_WINMM=ON -DALSOFT_REQUIRE_DSOUND=ON -DALSOFT_REQUIRE_WASAPI=ON"
+            lib: soft_oal.dll
+          - os: windows-latest
+            platform: win-x86
+            platform-name: Win32
+            cmake-opts: "-DALSOFT_BUILD_ROUTER=ON -DALSOFT_REQUIRE_WINMM=ON -DALSOFT_REQUIRE_DSOUND=ON -DALSOFT_REQUIRE_WASAPI=ON"
+            lib: soft_oal.dll
+          - os: macos-latest
+            platform: osx-x64
+            cmake-opts: "-DALSOFT_REQUIRE_COREAUDIO=ON"
+            lib: libopenal.dylib
+          - os: ubuntu-18.04
+            platform: linux-x64
+            cmake-opts: "-DALSOFT_REQUIRE_RTKIT=ON -DALSOFT_REQUIRE_ALSA=ON -DALSOFT_REQUIRE_OSS=ON -DALSOFT_REQUIRE_PORTAUDIO=ON -DALSOFT_REQUIRE_PULSEAUDIO=ON -DALSOFT_REQUIRE_JACK=ON"
+            lib: libopenal.so
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          repository: 'kcat/openal-soft'
+          ref: '1.21.1'
+      - name: Build openal-soft-${{ matrix.platform }}
+        run: |
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cmake -G "Visual Studio 16 2019" -A ${{ matrix.platform-name }} -B build ${{ matrix.cmake-opts }}
+            cmake --build build --config Release
+          else
+            if [[ "${{ matrix.os }}" == "ubuntu-18.04" ]]; then 
+              sudo apt update && sudo apt-get install -qq \
+                libpulse-dev \
+                portaudio19-dev \
+                libasound2-dev \
+                libjack-dev \
+                qtbase5-dev \
+                libdbus-1-dev
+            fi 
+            cmake -DCMAKE_BUILD_TYPE=Release -B build/Release ${{ matrix.cmake-opts }}
+            cmake --build build/Release
+          fi
+      - run: |
+          mkdir tmp
+          cp build/Release/${{ matrix.lib }} tmp
+          cp COPYING tmp
+      - uses: actions/upload-artifact@v2
+        with:
+          name: openal-soft-${{ matrix.platform }}
+          path: tmp
